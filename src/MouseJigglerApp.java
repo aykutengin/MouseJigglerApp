@@ -137,8 +137,10 @@ public class MouseJigglerApp {
                     robot.mouseMove(currentMouseLocation.x + xOffset, currentMouseLocation.y + yOffset);
                     logger.info("Mouse moved slightly at " + LocalTime.now().withNano(0));
                 }
-            } catch (AWTException | InterruptedException e) {
+            } catch (AWTException e) {
                 logger.log(Level.SEVERE, "Error in Mouse Jiggler", e);
+            } catch (InterruptedException e) {
+                logger.info("Jiggler thread interrupted.");
                 Thread.currentThread().interrupt();
             } finally {
                 running = false;
