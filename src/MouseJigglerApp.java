@@ -14,6 +14,13 @@ public class MouseJigglerApp {
     private static final Random random = new Random();
     private static JLabel statusLabel;
     private static JTextArea logArea;
+    private static JComboBox<String> modeComboBox;
+    private static JSpinner durationSpinner;
+    private static JSpinner startHourSpinner;
+    private static JSpinner endHourSpinner;
+    private static JLabel durationLabel;
+    private static JLabel startHourLabel;
+    private static JLabel endHourLabel;
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(MouseJigglerApp::createAndShowGUI);
@@ -22,7 +29,7 @@ public class MouseJigglerApp {
     private static void createAndShowGUI() {
         JFrame frame = new JFrame("Mouse Jiggler");
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        frame.setSize(400, 300);
+        frame.setSize(400, 400);
         frame.setLayout(new GridBagLayout());
         frame.setResizable(false);
         frame.setLocationRelativeTo(null);
@@ -30,6 +37,15 @@ public class MouseJigglerApp {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5);
         gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        JLabel modeLabel = new JLabel("Mode:");
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        frame.add(modeLabel, gbc);
+
+        modeComboBox = new JComboBox<>(new String[]{"Non-stop", "For Duration", "Between Hours"});
+        gbc.gridx = 1;
+        frame.add(modeComboBox, gbc);
 
         JLabel idleTimeLabel = new JLabel("Idle Time (min):");
         gbc.gridx = 0;
@@ -49,28 +65,70 @@ public class MouseJigglerApp {
         gbc.gridx = 1;
         frame.add(moveIntervalSpinner, gbc);
 
+        durationLabel = new JLabel("Duration (hours):");
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        frame.add(durationLabel, gbc);
+
+        durationSpinner = new JSpinner(new SpinnerNumberModel(1, 1, 24, 1));
+        gbc.gridx = 1;
+        frame.add(durationSpinner, gbc);
+
+        startHourLabel = new JLabel("Start Hour:");
+        gbc.gridx = 0;
+        gbc.gridy = 4;
+        frame.add(startHourLabel, gbc);
+
+        startHourSpinner = new JSpinner(new SpinnerNumberModel(0, 0, 23, 1));
+        gbc.gridx = 1;
+        frame.add(startHourSpinner, gbc);
+
+        endHourLabel = new JLabel("End Hour:");
+        gbc.gridx = 0;
+        gbc.gridy = 5;
+        frame.add(endHourLabel, gbc);
+
+        endHourSpinner = new JSpinner(new SpinnerNumberModel(23, 0, 23, 1));
+        gbc.gridx = 1;
+        frame.add(endHourSpinner, gbc);
+
         JButton toggleButton = new JButton("Start");
         toggleButton.setFont(new Font("Arial", Font.BOLD, 14));
         gbc.gridx = 0;
-        gbc.gridy = 2;
+        gbc.gridy = 6;
         gbc.gridwidth = 2;
         frame.add(toggleButton, gbc);
 
         statusLabel = new JLabel("Status: Stopped", SwingConstants.CENTER);
-        gbc.gridy = 3;
+        gbc.gridy = 7;
         frame.add(statusLabel, gbc);
 
         logArea = new JTextArea(6, 30);
         logArea.setEditable(false);
         JScrollPane scrollPane = new JScrollPane(logArea);
-        gbc.gridy = 4;
+        gbc.gridy = 8;
         gbc.gridwidth = 2;
         gbc.fill = GridBagConstraints.BOTH;
         frame.add(scrollPane, gbc);
 
         setupLogger();
         toggleButton.addActionListener(e -> toggleJiggler(toggleButton, idleTimeSpinner, moveIntervalSpinner));
+        modeComboBox.addActionListener(e -> updateModeVisibility());
+        updateModeVisibility(); // Initial call to set visibility based on default selection
         frame.setVisible(true);
+    }
+
+    private static void updateModeVisibility() {
+        String selectedMode = (String) modeComboBox.getSelectedItem();
+        boolean isDurationMode = "For Duration".equals(selectedMode);
+        boolean isBetweenHoursMode = "Between Hours".equals(selectedMode);
+
+        durationLabel.setVisible(isDurationMode);
+        durationSpinner.setVisible(isDurationMode);
+        startHourLabel.setVisible(isBetweenHoursMode);
+        startHourSpinner.setVisible(isBetweenHoursMode);
+        endHourLabel.setVisible(isBetweenHoursMode);
+        endHourSpinner.setVisible(isBetweenHoursMode);
     }
 
     private static void setupLogger() {
@@ -118,6 +176,11 @@ public class MouseJigglerApp {
         Thread jigglerThread = new Thread(() -> {
             try {
                 robot = new Robot();
+                long startTime = System.currentTimeMillis();
+                long durationMillis = (int) durationSpinner.getValue() * 3600 * 1000L;
+                int startHour = (int) startHourSpinner.getValue();
+                int endHour = (int) endHourSpinner.getValue();
+
                 while (running) {
                     Point currentMouseLocation = MouseInfo.getPointerInfo().getLocation();
                     Thread.sleep(moveIntervalSeconds * 1000L);
@@ -136,6 +199,17 @@ public class MouseJigglerApp {
                     int yOffset = random.nextInt(10) - 5;
                     robot.mouseMove(currentMouseLocation.x + xOffset, currentMouseLocation.y + yOffset);
                     logger.info("Mouse moved slightly at " + LocalTime.now().withNano(0));
+
+                    if (modeComboBox.getSelectedItem().equals("For Duration") && System.currentTimeMillis() - startTime >= durationMillis) {
+                        break;
+                    }
+
+                    if (modeComboBox.getSelectedItem().equals("Between Hours")) {
+                        int currentHour = LocalTime.now().getHour();
+                        if (currentHour < startHour || currentHour >= endHour) {
+                            break;
+                        }
+                    }
                 }
             } catch (AWTException e) {
                 logger.log(Level.SEVERE, "Error in Mouse Jiggler", e);
