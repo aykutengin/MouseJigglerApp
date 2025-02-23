@@ -1,10 +1,15 @@
 import javax.swing.*;
 import java.awt.*;
+import java.text.SimpleDateFormat;
 import java.time.LocalTime;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.Random;
 import java.util.logging.*;
 
 public class MouseJigglerApp {
+
+    private static final String DATE_FORMAT_PATTERN = "HH:mm";
     private static volatile boolean running = false;
     private static Robot robot;
     private static final Logger logger = Logger.getLogger(MouseJigglerApp.class.getName());
@@ -38,15 +43,6 @@ public class MouseJigglerApp {
         gbc.insets = new Insets(5, 5, 5, 5);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        JLabel modeLabel = new JLabel("Mode:");
-        gbc.gridx = 0;
-        gbc.gridy = 2;
-        frame.add(modeLabel, gbc);
-
-        modeComboBox = new JComboBox<>(new String[]{"Non-stop", "For Duration", "Between Hours"});
-        gbc.gridx = 1;
-        frame.add(modeComboBox, gbc);
-
         JLabel idleTimeLabel = new JLabel("Idle Time (min):");
         gbc.gridx = 0;
         gbc.gridy = 0;
@@ -65,6 +61,15 @@ public class MouseJigglerApp {
         gbc.gridx = 1;
         frame.add(moveIntervalSpinner, gbc);
 
+        JLabel modeLabel = new JLabel("Mode:");
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        frame.add(modeLabel, gbc);
+
+        modeComboBox = new JComboBox<>(new String[]{"Non-stop", "For Duration", "Between Hours"});
+        gbc.gridx = 1;
+        frame.add(modeComboBox, gbc);
+
         durationLabel = new JLabel("Duration (hours):");
         gbc.gridx = 0;
         gbc.gridy = 3;
@@ -74,21 +79,31 @@ public class MouseJigglerApp {
         gbc.gridx = 1;
         frame.add(durationSpinner, gbc);
 
-        startHourLabel = new JLabel("Start Hour:");
+        startHourLabel = new JLabel("Start Time:");
         gbc.gridx = 0;
         gbc.gridy = 4;
         frame.add(startHourLabel, gbc);
 
-        startHourSpinner = new JSpinner(new SpinnerNumberModel(0, 0, 23, 1));
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(Calendar.HOUR_OF_DAY, 9);
+        calendar.set(Calendar.MINUTE, 0);
+        Date startTime = calendar.getTime();
+        startHourSpinner = new JSpinner(new SpinnerDateModel(startTime, null, null, Calendar.HOUR_OF_DAY));
+        JSpinner.DateEditor startEditor = new JSpinner.DateEditor(startHourSpinner, DATE_FORMAT_PATTERN);
+        startHourSpinner.setEditor(startEditor);
         gbc.gridx = 1;
         frame.add(startHourSpinner, gbc);
 
-        endHourLabel = new JLabel("End Hour:");
+        endHourLabel = new JLabel("End Time:");
         gbc.gridx = 0;
         gbc.gridy = 5;
         frame.add(endHourLabel, gbc);
 
-        endHourSpinner = new JSpinner(new SpinnerNumberModel(23, 0, 23, 1));
+        calendar.set(Calendar.HOUR_OF_DAY, 18);
+        Date endTime = calendar.getTime();
+        endHourSpinner = new JSpinner(new SpinnerDateModel(endTime, null, null, Calendar.HOUR_OF_DAY));
+        JSpinner.DateEditor endEditor = new JSpinner.DateEditor(endHourSpinner, DATE_FORMAT_PATTERN);
+        endHourSpinner.setEditor(endEditor);
         gbc.gridx = 1;
         frame.add(endHourSpinner, gbc);
 
@@ -154,12 +169,26 @@ public class MouseJigglerApp {
         if (running) {
             stopJiggler(button);
         } else {
+            if (!validateTimeInputs()) {
+                return;
+            }
             idleTimeMinutes = (int) idleTimeSpinner.getValue();
             moveIntervalSeconds = (int) moveIntervalSpinner.getValue();
             logger.info(String.format("Idle time set to %d minutes.", idleTimeMinutes));
             logger.info(String.format("Move interval set to %d seconds.", moveIntervalSeconds));
             startJiggler(button);
         }
+    }
+
+    private static boolean validateTimeInputs() {
+        Date startHour = (Date) startHourSpinner.getValue();
+        Date endHour = (Date) endHourSpinner.getValue();
+
+        if (startHour.after(endHour)) {
+            JOptionPane.showMessageDialog(null, "Start time must be before end time.", "Invalid Time Input", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+        return true;
     }
 
     private static void startJiggler(JButton button) {
@@ -178,8 +207,9 @@ public class MouseJigglerApp {
                 robot = new Robot();
                 long startTime = System.currentTimeMillis();
                 long durationMillis = (int) durationSpinner.getValue() * 3600 * 1000L;
-                int startHour = (int) startHourSpinner.getValue();
-                int endHour = (int) endHourSpinner.getValue();
+                SimpleDateFormat sdf = new SimpleDateFormat(DATE_FORMAT_PATTERN);
+                Date startHour = (Date) startHourSpinner.getValue();
+                Date endHour = (Date) endHourSpinner.getValue();
 
                 while (running) {
                     Point currentMouseLocation = MouseInfo.getPointerInfo().getLocation();
@@ -205,8 +235,8 @@ public class MouseJigglerApp {
                     }
 
                     if (modeComboBox.getSelectedItem().equals("Between Hours")) {
-                        int currentHour = LocalTime.now().getHour();
-                        if (currentHour < startHour || currentHour >= endHour) {
+                        Date currentTime = sdf.parse(sdf.format(new Date()));
+                        if (currentTime.before(startHour) || currentTime.after(endHour)) {
                             break;
                         }
                     }
@@ -216,6 +246,8 @@ public class MouseJigglerApp {
             } catch (InterruptedException e) {
                 logger.info("Jiggler thread interrupted.");
                 Thread.currentThread().interrupt();
+            } catch (Exception e) {
+                logger.log(Level.SEVERE, "Error parsing time", e);
             } finally {
                 running = false;
                 SwingUtilities.invokeLater(() -> stopJiggler(button));
