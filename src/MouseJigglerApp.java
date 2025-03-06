@@ -212,6 +212,19 @@ public class MouseJigglerApp {
                 Date endHour = (Date) endHourSpinner.getValue();
 
                 while (running) {
+                    if (modeComboBox.getSelectedItem().equals("For Duration") && System.currentTimeMillis() - startTime >= durationMillis) {
+                        logger.info(String.format("The specified duration has been exceeded."));
+                        break;
+                    }
+
+                    if (modeComboBox.getSelectedItem().equals("Between Hours")) {
+                        Date currentTime = sdf.parse(sdf.format(new Date()));
+                        if (currentTime.before(startHour) || currentTime.after(endHour)) {
+                            logger.info(String.format("The time is out of hours range"));
+                            break;
+                        }
+                    }
+
                     Point currentMouseLocation = MouseInfo.getPointerInfo().getLocation();
                     Thread.sleep(moveIntervalSeconds * 1000L);
                     Point newMouseLocation = MouseInfo.getPointerInfo().getLocation();
@@ -229,17 +242,6 @@ public class MouseJigglerApp {
                     int yOffset = random.nextInt(10) - 5;
                     robot.mouseMove(currentMouseLocation.x + xOffset, currentMouseLocation.y + yOffset);
                     logger.info("Mouse moved slightly at " + LocalTime.now().withNano(0));
-
-                    if (modeComboBox.getSelectedItem().equals("For Duration") && System.currentTimeMillis() - startTime >= durationMillis) {
-                        break;
-                    }
-
-                    if (modeComboBox.getSelectedItem().equals("Between Hours")) {
-                        Date currentTime = sdf.parse(sdf.format(new Date()));
-                        if (currentTime.before(startHour) || currentTime.after(endHour)) {
-                            break;
-                        }
-                    }
                 }
             } catch (AWTException e) {
                 logger.log(Level.SEVERE, "Error in Mouse Jiggler", e);
