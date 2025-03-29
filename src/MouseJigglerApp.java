@@ -26,6 +26,7 @@ public class MouseJigglerApp {
     private static JLabel durationLabel;
     private static JLabel startHourLabel;
     private static JLabel endHourLabel;
+    private static JCheckBox fullscreenCheckBox;
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(MouseJigglerApp::createAndShowGUI);
@@ -107,21 +108,27 @@ public class MouseJigglerApp {
         gbc.gridx = 1;
         frame.add(endHourSpinner, gbc);
 
+        fullscreenCheckBox = new JCheckBox("Pause when fullscreen");
+        gbc.gridx = 0;
+        gbc.gridy = 6;
+        gbc.gridwidth = 2;
+        frame.add(fullscreenCheckBox, gbc);
+
         JButton toggleButton = new JButton("Start");
         toggleButton.setFont(new Font("Arial", Font.BOLD, 14));
         gbc.gridx = 0;
-        gbc.gridy = 6;
+        gbc.gridy = 7;
         gbc.gridwidth = 2;
         frame.add(toggleButton, gbc);
 
         statusLabel = new JLabel("Status: Stopped", SwingConstants.CENTER);
-        gbc.gridy = 7;
+        gbc.gridy = 8;
         frame.add(statusLabel, gbc);
 
         logArea = new JTextArea(6, 30);
         logArea.setEditable(false);
         JScrollPane scrollPane = new JScrollPane(logArea);
-        gbc.gridy = 8;
+        gbc.gridy = 9;
         gbc.gridwidth = 2;
         gbc.fill = GridBagConstraints.BOTH;
         frame.add(scrollPane, gbc);
@@ -213,16 +220,26 @@ public class MouseJigglerApp {
 
                 while (running) {
                     if (modeComboBox.getSelectedItem().equals("For Duration") && System.currentTimeMillis() - startTime >= durationMillis) {
-                        logger.info(String.format("The specified duration has been exceeded."));
+                        logger.info("The specified duration has been exceeded.");
                         break;
                     }
 
                     if (modeComboBox.getSelectedItem().equals("Between Hours")) {
                         Date currentTime = sdf.parse(sdf.format(new Date()));
                         if (currentTime.before(startHour) || currentTime.after(endHour)) {
-                            logger.info(String.format("The time is out of hours range"));
+                            logger.info("The time is out of hours range");
                             break;
                         }
+                    }
+
+                    if (fullscreenCheckBox.isSelected() && isFullscreen()) {
+                        statusLabel.setText("Status: Paused (Fullscreen)");
+                        logger.info("Fullscreen mode detected. Pausing jiggler.");
+                        while (isFullscreen()) {
+                            Thread.sleep(1000); // Check every second if fullscreen mode is still active
+                        }
+                        statusLabel.setText("Status: Running");
+                        logger.info("Fullscreen mode exited. Resuming jiggler.");
                     }
 
                     Point currentMouseLocation = MouseInfo.getPointerInfo().getLocation();
@@ -256,6 +273,11 @@ public class MouseJigglerApp {
             }
         });
         jigglerThread.start();
+    }
+
+    private static boolean isFullscreen() {
+        GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+        return gd.getFullScreenWindow() != null;
     }
 
     private static void stopJiggler(JButton button) {
