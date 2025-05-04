@@ -26,7 +26,6 @@ public class MouseJigglerApp {
     private static JLabel durationLabel;
     private static JLabel startHourLabel;
     private static JLabel endHourLabel;
-    private static JCheckBox fullscreenCheckBox;
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(MouseJigglerApp::createAndShowGUI);
@@ -107,12 +106,6 @@ public class MouseJigglerApp {
         endHourSpinner.setEditor(endEditor);
         gbc.gridx = 1;
         frame.add(endHourSpinner, gbc);
-
-        fullscreenCheckBox = new JCheckBox("Pause when fullscreen");
-        gbc.gridx = 0;
-        gbc.gridy = 6;
-        gbc.gridwidth = 2;
-        frame.add(fullscreenCheckBox, gbc);
 
         JButton toggleButton = new JButton("Start");
         toggleButton.setFont(new Font("Arial", Font.BOLD, 14));
@@ -232,16 +225,6 @@ public class MouseJigglerApp {
                         }
                     }
 
-                    if (fullscreenCheckBox.isSelected() && isFullscreen()) {
-                        statusLabel.setText("Status: Paused (Fullscreen)");
-                        logger.info("Fullscreen mode detected. Pausing jiggler.");
-                        while (isFullscreen()) {
-                            Thread.sleep(1000); // Check every second if fullscreen mode is still active
-                        }
-                        statusLabel.setText("Status: Running");
-                        logger.info("Fullscreen mode exited. Resuming jiggler.");
-                    }
-
                     Point currentMouseLocation = MouseInfo.getPointerInfo().getLocation();
                     Thread.sleep(moveIntervalSeconds * 1000L);
                     Point newMouseLocation = MouseInfo.getPointerInfo().getLocation();
@@ -273,11 +256,6 @@ public class MouseJigglerApp {
             }
         });
         jigglerThread.start();
-    }
-
-    private static boolean isFullscreen() {
-        GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
-        return gd.getFullScreenWindow() != null;
     }
 
     private static void stopJiggler(JButton button) {
