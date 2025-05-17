@@ -1,6 +1,5 @@
 import javax.swing.*;
 import java.awt.*;
-import java.text.SimpleDateFormat;
 import java.time.LocalTime;
 import java.util.Calendar;
 import java.util.Date;
@@ -89,6 +88,7 @@ public class MouseJigglerApp {
         Calendar calendar = Calendar.getInstance();
         calendar.set(Calendar.HOUR_OF_DAY, 9);
         calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
         Date startTime = calendar.getTime();
         startHourSpinner = new JSpinner(new SpinnerDateModel(startTime, null, null, Calendar.HOUR_OF_DAY));
         JSpinner.DateEditor startEditor = new JSpinner.DateEditor(startHourSpinner, DATE_FORMAT_PATTERN);
@@ -199,7 +199,7 @@ public class MouseJigglerApp {
         statusLabel.setText("Status: Running");
         logArea.setText(""); // Clearing logArea
         logger.info("Mouse Jiggler started.");
-        idleTimer = new Timer(idleTimeMinutes * 60 * 100, e -> {
+        idleTimer = new Timer(idleTimeMinutes * 60 * 1000, e -> {
             statusLabel.setText("Status: Running");
             logger.info("Idle time over, resuming mouse jiggling.");
         });
@@ -209,18 +209,17 @@ public class MouseJigglerApp {
                 robot = new Robot();
                 long startTime = System.currentTimeMillis();
                 long durationMillis = (int) durationSpinner.getValue() * 3600 * 1000L;
-                SimpleDateFormat sdf = new SimpleDateFormat(DATE_FORMAT_PATTERN);
-                Date startHour = (Date) startHourSpinner.getValue();
-                Date endHour = (Date) endHourSpinner.getValue();
+                Date startDate = ((Date) startHourSpinner.getValue());
+                Date endDate = ((Date) endHourSpinner.getValue());
 
                 while (running) {
                     if (modeComboBox.getSelectedItem().equals(FOR_DURATION) && System.currentTimeMillis() - startTime >= durationMillis) {
                         logger.info("The specified duration has been exceeded.");
                         break;
-                    }
-                    else if (modeComboBox.getSelectedItem().equals(BETWEEN_HOURS)) {
-                        Date currentTime = sdf.parse(sdf.format(new Date()));
-                        if (currentTime.before(startHour) || currentTime.after(endHour)) {
+                    } else if (modeComboBox.getSelectedItem().equals(BETWEEN_HOURS)) {
+                        Date currentDate = new Date(System.currentTimeMillis());
+                        logger.finest("currentDate: " + currentDate + ", startDate: " + startDate + ", endDate: " + endDate);
+                        if ((currentDate.before(startDate)) || (currentDate.after(endDate))) {
                             logger.info("The time is out of hours range");
                             break;
                         }
