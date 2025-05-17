@@ -67,7 +67,7 @@ public class MouseJigglerApp {
         gbc.gridy = 2;
         frame.add(modeLabel, gbc);
 
-        modeComboBox = new JComboBox<>(new String[]{"Non-stop", FOR_DURATION, BETWEEN_HOURS});
+        modeComboBox = new JComboBox<>(new String[]{"Infinite", FOR_DURATION, BETWEEN_HOURS});
         gbc.gridx = 1;
         frame.add(modeComboBox, gbc);
 
