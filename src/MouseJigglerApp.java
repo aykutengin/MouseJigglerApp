@@ -10,6 +10,8 @@ import java.util.logging.*;
 public class MouseJigglerApp {
 
     private static final String DATE_FORMAT_PATTERN = "HH:mm";
+    private static final String BETWEEN_HOURS = "Between Hours";
+    private static final String FOR_DURATION = "For Duration";
     private static volatile boolean running = false;
     private static Robot robot;
     private static final Logger logger = Logger.getLogger(MouseJigglerApp.class.getName());
@@ -66,7 +68,7 @@ public class MouseJigglerApp {
         gbc.gridy = 2;
         frame.add(modeLabel, gbc);
 
-        modeComboBox = new JComboBox<>(new String[]{"Non-stop", "For Duration", "Between Hours"});
+        modeComboBox = new JComboBox<>(new String[]{"Non-stop", FOR_DURATION, BETWEEN_HOURS});
         gbc.gridx = 1;
         frame.add(modeComboBox, gbc);
 
@@ -135,8 +137,8 @@ public class MouseJigglerApp {
 
     private static void updateModeVisibility() {
         String selectedMode = (String) modeComboBox.getSelectedItem();
-        boolean isDurationMode = "For Duration".equals(selectedMode);
-        boolean isBetweenHoursMode = "Between Hours".equals(selectedMode);
+        boolean isDurationMode = FOR_DURATION.equals(selectedMode);
+        boolean isBetweenHoursMode = BETWEEN_HOURS.equals(selectedMode);
 
         durationLabel.setVisible(isDurationMode);
         durationSpinner.setVisible(isDurationMode);
@@ -202,7 +204,7 @@ public class MouseJigglerApp {
             logger.info("Idle time over, resuming mouse jiggling.");
         });
         idleTimer.setRepeats(false);
-        Thread jigglerThread = new Thread(() -> {
+        Thread.ofVirtual().start(() -> {
             try {
                 robot = new Robot();
                 long startTime = System.currentTimeMillis();
@@ -212,12 +214,11 @@ public class MouseJigglerApp {
                 Date endHour = (Date) endHourSpinner.getValue();
 
                 while (running) {
-                    if (modeComboBox.getSelectedItem().equals("For Duration") && System.currentTimeMillis() - startTime >= durationMillis) {
+                    if (modeComboBox.getSelectedItem().equals(FOR_DURATION) && System.currentTimeMillis() - startTime >= durationMillis) {
                         logger.info("The specified duration has been exceeded.");
                         break;
                     }
-
-                    if (modeComboBox.getSelectedItem().equals("Between Hours")) {
+                    else if (modeComboBox.getSelectedItem().equals(BETWEEN_HOURS)) {
                         Date currentTime = sdf.parse(sdf.format(new Date()));
                         if (currentTime.before(startHour) || currentTime.after(endHour)) {
                             logger.info("The time is out of hours range");
@@ -255,7 +256,6 @@ public class MouseJigglerApp {
                 SwingUtilities.invokeLater(() -> stopJiggler(button));
             }
         });
-        jigglerThread.start();
     }
 
     private static void stopJiggler(JButton button) {
