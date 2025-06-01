@@ -35,7 +35,7 @@ public class MouseJigglerApp {
     private static void createAndShowGUI() {
         JFrame frame = new JFrame("Mouse Jiggler");
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        frame.setSize(400, 400);
+        frame.setSize(400, 350);
         frame.setLayout(new GridBagLayout());
         frame.setResizable(false);
         frame.setLocationRelativeTo(null);
