@@ -178,8 +178,10 @@ public class MouseJigglerApp {
             }
             idleTimeMinutes = (int) idleTimeSpinner.getValue();
             moveIntervalSeconds = (int) moveIntervalSpinner.getValue();
-            logger.log(Level.INFO, "Idle time set to {0} minutes.", idleTimeMinutes);
-            logger.log(Level.INFO, "Move interval set to {0} seconds.", moveIntervalSeconds);
+            if (logger.isLoggable(Level.INFO)) {
+                logger.info(String.format("Idle time set to %d minutes.", idleTimeMinutes));
+                logger.info(String.format("Move interval set to %d seconds.", moveIntervalSeconds));
+            }
             startJiggler(button);
         }
     }
