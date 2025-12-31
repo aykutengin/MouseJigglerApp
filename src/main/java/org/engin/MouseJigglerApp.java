@@ -1,3 +1,5 @@
+package org.engin;
+
 import javax.swing.*;
 import java.awt.*;
 import java.time.LocalTime;
@@ -29,7 +31,7 @@ public class MouseJigglerApp {
     private static JLabel endHourLabel;
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(MouseJigglerApp::createAndShowGUI);
+        SwingUtilities.invokeLater(org.engin.MouseJigglerApp::createAndShowGUI);
     }
 
     private static void createAndShowGUI() {
@@ -176,8 +178,8 @@ public class MouseJigglerApp {
             }
             idleTimeMinutes = (int) idleTimeSpinner.getValue();
             moveIntervalSeconds = (int) moveIntervalSpinner.getValue();
-            logger.info(String.format("Idle time set to %d minutes.", idleTimeMinutes));
-            logger.info(String.format("Move interval set to %d seconds.", moveIntervalSeconds));
+            logger.log(Level.INFO, "Idle time set to {0} minutes.", idleTimeMinutes);
+            logger.log(Level.INFO, "Move interval set to {0} seconds.", moveIntervalSeconds);
             startJiggler(button);
         }
     }
@@ -213,10 +215,10 @@ public class MouseJigglerApp {
                 Date endDate = ((Date) endHourSpinner.getValue());
 
                 while (running) {
-                    if (modeComboBox.getSelectedItem().equals(FOR_DURATION) && System.currentTimeMillis() - startTime >= durationMillis) {
+                    if (FOR_DURATION.equals(modeComboBox.getSelectedItem()) && System.currentTimeMillis() - startTime >= durationMillis) {
                         logger.info("The specified duration has been exceeded.");
                         break;
-                    } else if (modeComboBox.getSelectedItem().equals(BETWEEN_HOURS)) {
+                    } else if (BETWEEN_HOURS.equals(modeComboBox.getSelectedItem())) {
                         Date currentDate = new Date(System.currentTimeMillis());
                         logger.finest("currentDate: " + currentDate + ", startDate: " + startDate + ", endDate: " + endDate);
                         if ((currentDate.before(startDate)) || (currentDate.after(endDate))) {
@@ -245,7 +247,7 @@ public class MouseJigglerApp {
                 }
             } catch (AWTException e) {
                 logger.log(Level.SEVERE, "Error in Mouse Jiggler", e);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 logger.info("Jiggler thread interrupted.");
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
