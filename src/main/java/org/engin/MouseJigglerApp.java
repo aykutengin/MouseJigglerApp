@@ -1,269 +1,242 @@
 package org.engin;
 
-import javax.swing.*;
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.geometry.Insets;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextArea;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
+
 import java.awt.*;
 import java.time.LocalTime;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.Random;
 import java.util.logging.*;
 
-public class MouseJigglerApp {
+public class MouseJigglerApp extends Application {
 
-    private static final String DATE_FORMAT_PATTERN = "HH:mm";
     private static final String BETWEEN_HOURS = "Between Hours";
     private static final String FOR_DURATION = "For Duration";
-    private static volatile boolean running = false;
-    private static Robot robot;
-    private static final Logger logger = Logger.getLogger(MouseJigglerApp.class.getName());
-    private static Timer idleTimer;
-    private static int idleTimeMinutes = 3;
-    private static int moveIntervalSeconds = 5;
-    private static final Random random = new Random();
-    private static JLabel statusLabel;
-    private static JTextArea logArea;
-    private static JComboBox<String> modeComboBox;
-    private static JSpinner durationSpinner;
-    private static JSpinner startHourSpinner;
-    private static JSpinner endHourSpinner;
-    private static JLabel durationLabel;
-    private static JLabel startHourLabel;
-    private static JLabel endHourLabel;
+    private volatile boolean running = false;
+    private Robot robot;
+    private final Logger logger = Logger.getLogger(MouseJigglerApp.class.getName());
+    private int idleTimeMinutes = 3;
+    private int moveIntervalSeconds = 5;
+    private final Random random = new Random();
 
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(org.engin.MouseJigglerApp::createAndShowGUI);
+    private Label statusLabel;
+    private TextArea logArea;
+    private ComboBox<String> modeComboBox;
+    private Spinner<Integer> durationSpinner;
+    private Spinner<Integer> startHourSpinner;
+    private Spinner<Integer> startMinSpinner;
+    private Spinner<Integer> endHourSpinner;
+    private Spinner<Integer> endMinSpinner;
+    private Label durationLabel;
+    private Label startTimeLabel;
+    private Label endTimeLabel;
+
+    static void main(String[] args) {
+        launch(args);
     }
 
-    private static void createAndShowGUI() {
-        JFrame frame = new JFrame("Mouse Jiggler");
-        frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        frame.setSize(400, 350);
-        frame.setLayout(new GridBagLayout());
-        frame.setResizable(false);
-        frame.setLocationRelativeTo(null);
+    @Override
+    public void start(Stage primaryStage) {
+        primaryStage.setTitle("Mouse Jiggler");
 
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
+        GridPane grid = new GridPane();
+        grid.setPadding(new Insets(10, 10, 10, 10));
+        grid.setVgap(8);
+        grid.setHgap(10);
 
-        JLabel idleTimeLabel = new JLabel("Idle Time (min):");
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        frame.add(idleTimeLabel, gbc);
+        // Idle Time
+        grid.add(new Label("Idle Time (min):"), 0, 0);
+        Spinner<Integer> idleTimeSpinner = new Spinner<>(1, 60, idleTimeMinutes);
+        grid.add(idleTimeSpinner, 1, 0);
 
-        JSpinner idleTimeSpinner = new JSpinner(new SpinnerNumberModel(idleTimeMinutes, 1, 60, 1));
-        gbc.gridx = 1;
-        frame.add(idleTimeSpinner, gbc);
+        // Move Interval
+        grid.add(new Label("Move Interval (sec):"), 0, 1);
+        Spinner<Integer> moveIntervalSpinner = new Spinner<>(1, 60, moveIntervalSeconds);
+        grid.add(moveIntervalSpinner, 1, 1);
 
-        JLabel moveIntervalLabel = new JLabel("Move Interval (sec):");
-        gbc.gridx = 0;
-        gbc.gridy = 1;
-        frame.add(moveIntervalLabel, gbc);
+        // Mode
+        grid.add(new Label("Mode:"), 0, 2);
+        modeComboBox = new ComboBox<>(FXCollections.observableArrayList("Infinite", FOR_DURATION, BETWEEN_HOURS));
+        modeComboBox.setValue("Infinite");
+        grid.add(modeComboBox, 1, 2);
 
-        JSpinner moveIntervalSpinner = new JSpinner(new SpinnerNumberModel(moveIntervalSeconds, 1, 60, 1));
-        gbc.gridx = 1;
-        frame.add(moveIntervalSpinner, gbc);
+        // Duration
+        durationLabel = new Label("Duration (hours):");
+        durationSpinner = new Spinner<>(1, 24, 1);
+        grid.add(durationLabel, 0, 3);
+        grid.add(durationSpinner, 1, 3);
 
-        JLabel modeLabel = new JLabel("Mode:");
-        gbc.gridx = 0;
-        gbc.gridy = 2;
-        frame.add(modeLabel, gbc);
+        // Start Time
+        startTimeLabel = new Label("Start Time (HH:mm):");
+        startHourSpinner = new Spinner<>(0, 23, 9);
+        startMinSpinner = new Spinner<>(0, 59, 0);
+        VBox startTimeBox = new VBox(5, startHourSpinner, startMinSpinner);
+        grid.add(startTimeLabel, 0, 4);
+        grid.add(startTimeBox, 1, 4);
 
-        modeComboBox = new JComboBox<>(new String[]{"Infinite", FOR_DURATION, BETWEEN_HOURS});
-        gbc.gridx = 1;
-        frame.add(modeComboBox, gbc);
+        // End Time
+        endTimeLabel = new Label("End Time (HH:mm):");
+        endHourSpinner = new Spinner<>(0, 23, 18);
+        endMinSpinner = new Spinner<>(0, 59, 0);
+        VBox endTimeBox = new VBox(5, endHourSpinner, endMinSpinner);
+        grid.add(endTimeLabel, 0, 5);
+        grid.add(endTimeBox, 1, 5);
 
-        durationLabel = new JLabel("Duration (hours):");
-        gbc.gridx = 0;
-        gbc.gridy = 3;
-        frame.add(durationLabel, gbc);
+        Button toggleButton = new Button("Start");
+        toggleButton.setMaxWidth(Double.MAX_VALUE);
+        grid.add(toggleButton, 0, 6, 2, 1);
 
-        durationSpinner = new JSpinner(new SpinnerNumberModel(1, 1, 24, 1));
-        gbc.gridx = 1;
-        frame.add(durationSpinner, gbc);
+        statusLabel = new Label("Status: Stopped");
+        grid.add(statusLabel, 0, 7, 2, 1);
 
-        startHourLabel = new JLabel("Start Time:");
-        gbc.gridx = 0;
-        gbc.gridy = 4;
-        frame.add(startHourLabel, gbc);
-
-        Calendar calendar = Calendar.getInstance();
-        calendar.set(Calendar.HOUR_OF_DAY, 9);
-        calendar.set(Calendar.MINUTE, 0);
-        calendar.set(Calendar.SECOND, 0);
-        Date startTime = calendar.getTime();
-        startHourSpinner = new JSpinner(new SpinnerDateModel(startTime, null, null, Calendar.HOUR_OF_DAY));
-        JSpinner.DateEditor startEditor = new JSpinner.DateEditor(startHourSpinner, DATE_FORMAT_PATTERN);
-        startHourSpinner.setEditor(startEditor);
-        gbc.gridx = 1;
-        frame.add(startHourSpinner, gbc);
-
-        endHourLabel = new JLabel("End Time:");
-        gbc.gridx = 0;
-        gbc.gridy = 5;
-        frame.add(endHourLabel, gbc);
-
-        calendar.set(Calendar.HOUR_OF_DAY, 18);
-        Date endTime = calendar.getTime();
-        endHourSpinner = new JSpinner(new SpinnerDateModel(endTime, null, null, Calendar.HOUR_OF_DAY));
-        JSpinner.DateEditor endEditor = new JSpinner.DateEditor(endHourSpinner, DATE_FORMAT_PATTERN);
-        endHourSpinner.setEditor(endEditor);
-        gbc.gridx = 1;
-        frame.add(endHourSpinner, gbc);
-
-        JButton toggleButton = new JButton("Start");
-        toggleButton.setFont(new Font("Arial", Font.BOLD, 14));
-        gbc.gridx = 0;
-        gbc.gridy = 7;
-        gbc.gridwidth = 2;
-        frame.add(toggleButton, gbc);
-
-        statusLabel = new JLabel("Status: Stopped", SwingConstants.CENTER);
-        gbc.gridy = 8;
-        frame.add(statusLabel, gbc);
-
-        logArea = new JTextArea(6, 30);
+        logArea = new TextArea();
         logArea.setEditable(false);
-        JScrollPane scrollPane = new JScrollPane(logArea);
-        gbc.gridy = 9;
-        gbc.gridwidth = 2;
-        gbc.fill = GridBagConstraints.BOTH;
-        frame.add(scrollPane, gbc);
+        logArea.setPrefRowCount(6);
+        grid.add(logArea, 0, 8, 2, 1);
 
         setupLogger();
-        toggleButton.addActionListener(e -> toggleJiggler(toggleButton, idleTimeSpinner, moveIntervalSpinner));
-        modeComboBox.addActionListener(e -> updateModeVisibility());
-        updateModeVisibility(); // Initial call to set visibility based on default selection
-        frame.setVisible(true);
+
+        modeComboBox.setOnAction(e -> updateModeVisibility());
+        updateModeVisibility();
+
+        toggleButton.setOnAction(e -> toggleJiggler(toggleButton, idleTimeSpinner, moveIntervalSpinner));
+
+        Scene scene = new Scene(grid, 400, 500);
+        primaryStage.setScene(scene);
+        primaryStage.setResizable(false);
+        primaryStage.show();
     }
 
-    private static void updateModeVisibility() {
-        String selectedMode = (String) modeComboBox.getSelectedItem();
+    private void updateModeVisibility() {
+        String selectedMode = modeComboBox.getValue();
         boolean isDurationMode = FOR_DURATION.equals(selectedMode);
         boolean isBetweenHoursMode = BETWEEN_HOURS.equals(selectedMode);
 
         durationLabel.setVisible(isDurationMode);
         durationSpinner.setVisible(isDurationMode);
-        startHourLabel.setVisible(isBetweenHoursMode);
+        startTimeLabel.setVisible(isBetweenHoursMode);
         startHourSpinner.setVisible(isBetweenHoursMode);
-        endHourLabel.setVisible(isBetweenHoursMode);
+        startMinSpinner.setVisible(isBetweenHoursMode);
+        endTimeLabel.setVisible(isBetweenHoursMode);
         endHourSpinner.setVisible(isBetweenHoursMode);
+        endMinSpinner.setVisible(isBetweenHoursMode);
     }
 
-    private static void setupLogger() {
+    private void setupLogger() {
         logger.setUseParentHandlers(false);
-        StreamHandler handler = new StreamHandler() {
+        Handler handler = new Handler() {
             @Override
             public void publish(LogRecord logRecord) {
-                SwingUtilities.invokeLater(() -> {
-                    logArea.append(logRecord.getMessage() + "\n");
-                    logArea.setCaretPosition(logArea.getDocument().getLength()); // Auto-scroll
-                });
-                flush();
+                Platform.runLater(() -> logArea.appendText(logRecord.getMessage() + "\n"));
+            }
+
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() throws SecurityException {
             }
         };
         handler.setFormatter(new SimpleFormatter());
         logger.addHandler(handler);
     }
 
-    private static void toggleJiggler(JButton button, JSpinner idleTimeSpinner, JSpinner moveIntervalSpinner) {
-        button.setEnabled(false); // Prevent rapid toggling
-        SwingUtilities.invokeLater(() -> button.setEnabled(true));
-
+    private void toggleJiggler(Button button, Spinner<Integer> idleTimeSpinner, Spinner<Integer> moveIntervalSpinner) {
         if (running) {
             stopJiggler(button);
         } else {
-            if (!validateTimeInputs()) {
+            if (BETWEEN_HOURS.equals(modeComboBox.getValue()) && !validateTimeInputs()) {
                 return;
             }
-            idleTimeMinutes = (int) idleTimeSpinner.getValue();
-            moveIntervalSeconds = (int) moveIntervalSpinner.getValue();
-            if (logger.isLoggable(Level.INFO)) {
-                logger.info(String.format("Idle time set to %d minutes.", idleTimeMinutes));
-                logger.info(String.format("Move interval set to %d seconds.", moveIntervalSeconds));
-            }
+            idleTimeMinutes = idleTimeSpinner.getValue();
+            moveIntervalSeconds = moveIntervalSpinner.getValue();
+            logger.info(String.format("Idle time set to %d minutes.", idleTimeMinutes));
+            logger.info(String.format("Move interval set to %d seconds.", moveIntervalSeconds));
             startJiggler(button);
         }
     }
 
-    private static boolean validateTimeInputs() {
-        Date startHour = (Date) startHourSpinner.getValue();
-        Date endHour = (Date) endHourSpinner.getValue();
+    private boolean validateTimeInputs() {
+        int startH = startHourSpinner.getValue();
+        int startM = startMinSpinner.getValue();
+        int endH = endHourSpinner.getValue();
+        int endM = endMinSpinner.getValue();
 
-        if (startHour.after(endHour)) {
-            JOptionPane.showMessageDialog(null, "Start time must be before end time.", "Invalid Time Input", JOptionPane.ERROR_MESSAGE);
+        if (startH > endH || (startH == endH && startM >= endM)) {
+            Alert alert = new Alert(Alert.AlertType.ERROR, "Start time must be before end time.");
+            alert.showAndWait();
             return false;
         }
         return true;
     }
 
-    private static void startJiggler(JButton button) {
+    private void startJiggler(Button button) {
         running = true;
         button.setText("Stop");
         statusLabel.setText("Status: Running");
-        logArea.setText(""); // Clearing logArea
+        logArea.clear();
         logger.info("Mouse Jiggler started.");
-        idleTimer = new Timer(idleTimeMinutes * 60 * 1000, e -> {
-            statusLabel.setText("Status: Running");
-            logger.info("Idle time over, resuming mouse jiggling.");
-        });
-        idleTimer.setRepeats(false);
+
         Thread.ofVirtual().start(() -> {
             try {
                 robot = new Robot();
-                long startTime = System.currentTimeMillis();
-                long durationMillis = (int) durationSpinner.getValue() * 3600 * 1000L;
-                Date startDate = ((Date) startHourSpinner.getValue());
-                Date endDate = ((Date) endHourSpinner.getValue());
+                long startTimeMillis = System.currentTimeMillis();
+                long durationMillis = durationSpinner.getValue() * 3600 * 1000L;
 
                 while (running) {
-                    if (FOR_DURATION.equals(modeComboBox.getSelectedItem()) && System.currentTimeMillis() - startTime >= durationMillis) {
-                        logger.info("The specified duration has been exceeded.");
+                    String mode = modeComboBox.getValue();
+                    if (FOR_DURATION.equals(mode) && System.currentTimeMillis() - startTimeMillis >= durationMillis) {
+                        logger.info("Duration reached.");
                         break;
-                    } else if (BETWEEN_HOURS.equals(modeComboBox.getSelectedItem())) {
-                        Date currentDate = new Date(System.currentTimeMillis());
-                        logger.finest("currentDate: " + currentDate + ", startDate: " + startDate + ", endDate: " + endDate);
-                        if ((currentDate.before(startDate)) || (currentDate.after(endDate))) {
-                            logger.info("The time is out of hours range");
+                    } else if (BETWEEN_HOURS.equals(mode)) {
+                        LocalTime now = LocalTime.now();
+                        LocalTime start = LocalTime.of(startHourSpinner.getValue(), startMinSpinner.getValue());
+                        LocalTime end = LocalTime.of(endHourSpinner.getValue(), endMinSpinner.getValue());
+                        if (now.isBefore(start) || now.isAfter(end)) {
+                            logger.info("Outside of scheduled hours.");
                             break;
                         }
                     }
 
-                    Point currentMouseLocation = MouseInfo.getPointerInfo().getLocation();
+                    Point currentPos = MouseInfo.getPointerInfo().getLocation();
                     Thread.sleep(moveIntervalSeconds * 1000L);
-                    Point newMouseLocation = MouseInfo.getPointerInfo().getLocation();
+                    Point newPos = MouseInfo.getPointerInfo().getLocation();
 
-                    if (!currentMouseLocation.equals(newMouseLocation)) {
-                        statusLabel.setText("Status: Paused");
-                        logger.info(String.format("Mouse movement detected. Pausing for %s minutes.", idleTimeMinutes));
-                        idleTimer.restart();
-                        while (idleTimer.isRunning())
-                            Thread.sleep(moveIntervalSeconds * 1000L);
+                    if (!currentPos.equals(newPos)) {
+                        Platform.runLater(() -> statusLabel.setText("Status: Paused"));
+                        logger.info("Mouse movement detected. Pausing...");
+                        Thread.sleep(idleTimeMinutes * 60 * 1000L);
+                        Platform.runLater(() -> statusLabel.setText("Status: Running"));
                         continue;
                     }
 
-                    int xOffset = random.nextInt(10) - 5;
-                    int yOffset = random.nextInt(10) - 5;
-                    robot.mouseMove(currentMouseLocation.x + xOffset, currentMouseLocation.y + yOffset);
-                    logger.info("Mouse moved slightly at " + LocalTime.now().withNano(0));
+                    int dx = random.nextInt(11) - 5;
+                    int dy = random.nextInt(11) - 5;
+                    robot.mouseMove(currentPos.x + dx, currentPos.y + dy);
+                    logger.info("Mouse moved at " + LocalTime.now().withNano(0));
                 }
+            } catch (InterruptedException e) {
+                logger.log(Level.SEVERE, "Jiggler thread interrupted", e);
             } catch (AWTException e) {
-                logger.log(Level.SEVERE, "Error in Mouse Jiggler", e);
-            } catch (InterruptedException _) {
-                logger.info("Jiggler thread interrupted.");
-                Thread.currentThread().interrupt();
-            } catch (Exception e) {
-                logger.log(Level.SEVERE, "Error parsing time", e);
+                logger.log(Level.SEVERE, "AWT Error in jiggler", e);
             } finally {
-                running = false;
-                SwingUtilities.invokeLater(() -> stopJiggler(button));
+                Platform.runLater(() -> stopJiggler(button));
             }
         });
     }
 
-    private static void stopJiggler(JButton button) {
-        if (idleTimer != null)
-            idleTimer.stop();
+    private void stopJiggler(Button button) {
         running = false;
         button.setText("Start");
         statusLabel.setText("Status: Stopped");
