@@ -1,38 +1,26 @@
 package org.engin;
 
 import javafx.application.Application;
-import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.geometry.HPos;
 import javafx.geometry.Insets;
-import javafx.geometry.Point2D;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.robot.Robot;
 import javafx.stage.Stage;
 
 import java.time.LocalTime;
-import java.util.Random;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.logging.*;
 
 public class MouseJigglerApp extends Application {
 
-    private static final String BETWEEN_HOURS = "Between Hours";
-    private static final String FOR_DURATION = "For Duration";
-    private volatile boolean running = false;
-    private Robot robot;
-    private final Logger logger = Logger.getLogger(MouseJigglerApp.class.getName());
-    private int idleTimeMinutes = 3;
-    private int moveIntervalSeconds = 5;
-    private final Random random = new Random();
+    private final JigglerEngine jigglerEngine = new JigglerEngine();
 
     private Stage primaryStage;
     private Label statusLabel;
     private TextArea logArea;
-    private ComboBox<String> modeComboBox;
+    private ComboBox<JigglerMode> modeComboBox;
     private Spinner<Integer> durationSpinner;
     private Spinner<Integer> startHourSpinner;
     private Spinner<Integer> startMinSpinner;
@@ -43,6 +31,7 @@ public class MouseJigglerApp extends Application {
     private Label endTimeLabel;
     private VBox startTimeBox;
     private VBox endTimeBox;
+    private Button toggleButton;
 
     public static void main(String[] args) {
         launch(args);
@@ -57,21 +46,22 @@ public class MouseJigglerApp extends Application {
         grid.setPadding(new Insets(10, 10, 10, 10));
         grid.setVgap(8);
         grid.setHgap(10);
+        grid.setPrefWidth(400);
 
         // Idle Time
         grid.add(new Label("Idle Time (min):"), 0, 0);
-        Spinner<Integer> idleTimeSpinner = new Spinner<>(1, 60, idleTimeMinutes);
+        Spinner<Integer> idleTimeSpinner = new Spinner<>(1, 60, 3);
         grid.add(idleTimeSpinner, 1, 0);
 
         // Move Interval
         grid.add(new Label("Move Interval (sec):"), 0, 1);
-        Spinner<Integer> moveIntervalSpinner = new Spinner<>(1, 60, moveIntervalSeconds);
+        Spinner<Integer> moveIntervalSpinner = new Spinner<>(1, 60, 5);
         grid.add(moveIntervalSpinner, 1, 1);
 
         // Mode
         grid.add(new Label("Mode:"), 0, 2);
-        modeComboBox = new ComboBox<>(FXCollections.observableArrayList("Infinite", FOR_DURATION, BETWEEN_HOURS));
-        modeComboBox.setValue("Infinite");
+        modeComboBox = new ComboBox<>(FXCollections.observableArrayList(JigglerMode.values()));
+        modeComboBox.setValue(JigglerMode.INFINITE);
         grid.add(modeComboBox, 1, 2);
 
         // Duration
@@ -96,37 +86,51 @@ public class MouseJigglerApp extends Application {
         grid.add(endTimeLabel, 0, 5);
         grid.add(endTimeBox, 1, 5);
 
-        Button toggleButton = new Button("Start");
-        toggleButton.setMaxWidth(Double.MAX_VALUE);
-        grid.add(toggleButton, 0, 6, 2, 1);
-
         statusLabel = new Label("Status: Stopped");
-        grid.add(statusLabel, 0, 7, 2, 1);
+        statusLabel.setAlignment(Pos.CENTER);
+        statusLabel.setMaxWidth(Double.MAX_VALUE);
+        grid.add(statusLabel, 0, 6, 2, 1);
+        GridPane.setHalignment(statusLabel, HPos.CENTER);
+
+        toggleButton = new Button("Start");
+        toggleButton.setMaxWidth(Double.MAX_VALUE);
+        grid.add(toggleButton, 0, 7, 2, 1);
 
         logArea = new TextArea();
         logArea.setEditable(false);
         logArea.setPrefRowCount(6);
         grid.add(logArea, 0, 8, 2, 1);
 
-        setupLogger();
+        setupEngineCallbacks();
 
         modeComboBox.setOnAction(e -> updateModeVisibility());
-        updateModeVisibility();
 
-        toggleButton.setOnAction(e -> toggleJiggler(toggleButton, idleTimeSpinner, moveIntervalSpinner));
+        toggleButton.setOnAction(e -> toggleJiggler(idleTimeSpinner, moveIntervalSpinner));
 
-        Scene scene = new Scene(grid, 400, 450);
+        Scene scene = new Scene(grid);
         primaryStage.setScene(scene);
         primaryStage.setResizable(false);
         primaryStage.show();
 
-        robot = new Robot();
+        // Initial update after showing to ensure correct initial size
+        updateModeVisibility();
+    }
+
+    private void setupEngineCallbacks() {
+        jigglerEngine.setCallbacks(
+                status -> statusLabel.setText(status),
+                message -> logArea.appendText(message + "\n"),
+                () -> {
+                    toggleButton.setText("Start");
+                    statusLabel.setText("Status: Stopped");
+                }
+        );
     }
 
     private void updateModeVisibility() {
-        String selectedMode = modeComboBox.getValue();
-        boolean isDurationMode = FOR_DURATION.equals(selectedMode);
-        boolean isBetweenHoursMode = BETWEEN_HOURS.equals(selectedMode);
+        JigglerMode selectedMode = modeComboBox.getValue();
+        boolean isDurationMode = JigglerMode.FOR_DURATION == selectedMode;
+        boolean isBetweenHoursMode = JigglerMode.BETWEEN_HOURS == selectedMode;
 
         durationLabel.setVisible(isDurationMode);
         durationLabel.setManaged(isDurationMode);
@@ -143,41 +147,31 @@ public class MouseJigglerApp extends Application {
         endTimeBox.setVisible(isBetweenHoursMode);
         endTimeBox.setManaged(isBetweenHoursMode);
 
-        if (primaryStage != null) {
+        if (primaryStage != null && primaryStage.getScene() != null) {
             primaryStage.sizeToScene();
         }
     }
 
-    private void setupLogger() {
-        logger.setUseParentHandlers(false);
-        Handler handler = new Handler() {
-            @Override
-            public void publish(LogRecord logRecord) {
-                Platform.runLater(() -> logArea.appendText(logRecord.getMessage() + "\n"));
-            }
-
-            @Override
-            public void flush() {}
-
-            @Override
-            public void close() throws SecurityException {}
-        };
-        handler.setFormatter(new SimpleFormatter());
-        logger.addHandler(handler);
-    }
-
-    private void toggleJiggler(Button button, Spinner<Integer> idleTimeSpinner, Spinner<Integer> moveIntervalSpinner) {
-        if (running) {
-            stopJiggler(button);
+    private void toggleJiggler(Spinner<Integer> idleTimeSpinner, Spinner<Integer> moveIntervalSpinner) {
+        if (jigglerEngine.isRunning()) {
+            jigglerEngine.stop();
         } else {
-            if (BETWEEN_HOURS.equals(modeComboBox.getValue()) && !validateTimeInputs()) {
+            if (JigglerMode.BETWEEN_HOURS == modeComboBox.getValue() && !validateTimeInputs()) {
                 return;
             }
-            idleTimeMinutes = idleTimeSpinner.getValue();
-            moveIntervalSeconds = moveIntervalSpinner.getValue();
-            logger.info(String.format("Idle time set to %d minutes.", idleTimeMinutes));
-            logger.info(String.format("Move interval set to %d seconds.", moveIntervalSeconds));
-            startJiggler(button);
+
+            jigglerEngine.setConfig(
+                    idleTimeSpinner.getValue(),
+                    moveIntervalSpinner.getValue(),
+                    modeComboBox.getValue(),
+                    durationSpinner.getValue(),
+                    LocalTime.of(startHourSpinner.getValue(), startMinSpinner.getValue()),
+                    LocalTime.of(endHourSpinner.getValue(), endMinSpinner.getValue())
+            );
+
+            logArea.clear();
+            toggleButton.setText("Stop");
+            jigglerEngine.start();
         }
     }
 
@@ -193,79 +187,5 @@ public class MouseJigglerApp extends Application {
             return false;
         }
         return true;
-    }
-
-    private Point2D getMousePosition() {
-        CompletableFuture<Point2D> future = new CompletableFuture<>();
-        Platform.runLater(() -> future.complete(robot.getMousePosition()));
-        try {
-            return future.get();
-        } catch (InterruptedException | ExecutionException e) {
-            logger.log(Level.SEVERE, "Error getting mouse position", e);
-            return Point2D.ZERO;
-        }
-    }
-
-    private void mouseMove(double x, double y) {
-        Platform.runLater(() -> robot.mouseMove(x, y));
-    }
-
-    private void startJiggler(Button button) {
-        running = true;
-        button.setText("Stop");
-        statusLabel.setText("Status: Running");
-        logArea.clear();
-        logger.info("Mouse Jiggler started.");
-
-        Thread.ofVirtual().start(() -> {
-            try {
-                long startTimeMillis = System.currentTimeMillis();
-                long durationMillis = durationSpinner.getValue() * 3600 * 1000L;
-
-                while (running) {
-                    String mode = modeComboBox.getValue();
-                    if (FOR_DURATION.equals(mode) && System.currentTimeMillis() - startTimeMillis >= durationMillis) {
-                        logger.info("Duration reached.");
-                        break;
-                    } else if (BETWEEN_HOURS.equals(mode)) {
-                        LocalTime now = LocalTime.now();
-                        LocalTime start = LocalTime.of(startHourSpinner.getValue(), startMinSpinner.getValue());
-                        LocalTime end = LocalTime.of(endHourSpinner.getValue(), endMinSpinner.getValue());
-                        if (now.isBefore(start) || now.isAfter(end)) {
-                            logger.info("Outside of scheduled hours.");
-                            break;
-                        }
-                    }
-
-                    Point2D currentPos = getMousePosition();
-                    Thread.sleep(moveIntervalSeconds * 1000L);
-                    Point2D newPos = getMousePosition();
-
-                    if (!currentPos.equals(newPos)) {
-                        Platform.runLater(() -> statusLabel.setText("Status: Paused"));
-                        logger.info("Mouse movement detected. Pausing...");
-                        Thread.sleep(idleTimeMinutes * 60 * 1000L);
-                        Platform.runLater(() -> statusLabel.setText("Status: Running"));
-                        continue;
-                    }
-
-                    int dx = random.nextInt(11) - 5;
-                    int dy = random.nextInt(11) - 5;
-                    mouseMove(currentPos.getX() + dx, currentPos.getY() + dy);
-                    logger.info("Mouse moved at " + LocalTime.now().withNano(0));
-                }
-            } catch (InterruptedException e) {
-                logger.log(Level.SEVERE, "Jiggler thread interrupted", e);
-            } finally {
-                Platform.runLater(() -> stopJiggler(button));
-            }
-        });
-    }
-
-    private void stopJiggler(Button button) {
-        running = false;
-        button.setText("Start");
-        statusLabel.setText("Status: Stopped");
-        logger.info("Mouse Jiggler stopped.");
     }
 }
