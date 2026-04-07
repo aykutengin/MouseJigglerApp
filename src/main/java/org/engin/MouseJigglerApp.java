@@ -4,18 +4,18 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
+import javafx.geometry.Point2D;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.TextArea;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.robot.Robot;
 import javafx.stage.Stage;
 
-import java.awt.*;
 import java.time.LocalTime;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.*;
 
 public class MouseJigglerApp extends Application {
@@ -29,6 +29,7 @@ public class MouseJigglerApp extends Application {
     private int moveIntervalSeconds = 5;
     private final Random random = new Random();
 
+    private Stage primaryStage;
     private Label statusLabel;
     private TextArea logArea;
     private ComboBox<String> modeComboBox;
@@ -40,14 +41,17 @@ public class MouseJigglerApp extends Application {
     private Label durationLabel;
     private Label startTimeLabel;
     private Label endTimeLabel;
+    private VBox startTimeBox;
+    private VBox endTimeBox;
 
-    static void main(String[] args) {
+    public static void main(String[] args) {
         launch(args);
     }
 
     @Override
     public void start(Stage primaryStage) {
-        primaryStage.setTitle("Mouse Jiggler");
+        this.primaryStage = primaryStage;
+        this.primaryStage.setTitle("Mouse Jiggler");
 
         GridPane grid = new GridPane();
         grid.setPadding(new Insets(10, 10, 10, 10));
@@ -80,7 +84,7 @@ public class MouseJigglerApp extends Application {
         startTimeLabel = new Label("Start Time (HH:mm):");
         startHourSpinner = new Spinner<>(0, 23, 9);
         startMinSpinner = new Spinner<>(0, 59, 0);
-        VBox startTimeBox = new VBox(5, startHourSpinner, startMinSpinner);
+        startTimeBox = new VBox(5, startHourSpinner, startMinSpinner);
         grid.add(startTimeLabel, 0, 4);
         grid.add(startTimeBox, 1, 4);
 
@@ -88,7 +92,7 @@ public class MouseJigglerApp extends Application {
         endTimeLabel = new Label("End Time (HH:mm):");
         endHourSpinner = new Spinner<>(0, 23, 18);
         endMinSpinner = new Spinner<>(0, 59, 0);
-        VBox endTimeBox = new VBox(5, endHourSpinner, endMinSpinner);
+        endTimeBox = new VBox(5, endHourSpinner, endMinSpinner);
         grid.add(endTimeLabel, 0, 5);
         grid.add(endTimeBox, 1, 5);
 
@@ -111,10 +115,12 @@ public class MouseJigglerApp extends Application {
 
         toggleButton.setOnAction(e -> toggleJiggler(toggleButton, idleTimeSpinner, moveIntervalSpinner));
 
-        Scene scene = new Scene(grid, 400, 500);
+        Scene scene = new Scene(grid, 400, 450);
         primaryStage.setScene(scene);
         primaryStage.setResizable(false);
         primaryStage.show();
+
+        robot = new Robot();
     }
 
     private void updateModeVisibility() {
@@ -123,13 +129,23 @@ public class MouseJigglerApp extends Application {
         boolean isBetweenHoursMode = BETWEEN_HOURS.equals(selectedMode);
 
         durationLabel.setVisible(isDurationMode);
+        durationLabel.setManaged(isDurationMode);
         durationSpinner.setVisible(isDurationMode);
+        durationSpinner.setManaged(isDurationMode);
+
         startTimeLabel.setVisible(isBetweenHoursMode);
-        startHourSpinner.setVisible(isBetweenHoursMode);
-        startMinSpinner.setVisible(isBetweenHoursMode);
+        startTimeLabel.setManaged(isBetweenHoursMode);
+        startTimeBox.setVisible(isBetweenHoursMode);
+        startTimeBox.setManaged(isBetweenHoursMode);
+
         endTimeLabel.setVisible(isBetweenHoursMode);
-        endHourSpinner.setVisible(isBetweenHoursMode);
-        endMinSpinner.setVisible(isBetweenHoursMode);
+        endTimeLabel.setManaged(isBetweenHoursMode);
+        endTimeBox.setVisible(isBetweenHoursMode);
+        endTimeBox.setManaged(isBetweenHoursMode);
+
+        if (primaryStage != null) {
+            primaryStage.sizeToScene();
+        }
     }
 
     private void setupLogger() {
@@ -141,12 +157,10 @@ public class MouseJigglerApp extends Application {
             }
 
             @Override
-            public void flush() {
-            }
+            public void flush() {}
 
             @Override
-            public void close() throws SecurityException {
-            }
+            public void close() throws SecurityException {}
         };
         handler.setFormatter(new SimpleFormatter());
         logger.addHandler(handler);
@@ -181,6 +195,21 @@ public class MouseJigglerApp extends Application {
         return true;
     }
 
+    private Point2D getMousePosition() {
+        CompletableFuture<Point2D> future = new CompletableFuture<>();
+        Platform.runLater(() -> future.complete(robot.getMousePosition()));
+        try {
+            return future.get();
+        } catch (InterruptedException | ExecutionException e) {
+            logger.log(Level.SEVERE, "Error getting mouse position", e);
+            return Point2D.ZERO;
+        }
+    }
+
+    private void mouseMove(double x, double y) {
+        Platform.runLater(() -> robot.mouseMove(x, y));
+    }
+
     private void startJiggler(Button button) {
         running = true;
         button.setText("Stop");
@@ -190,7 +219,6 @@ public class MouseJigglerApp extends Application {
 
         Thread.ofVirtual().start(() -> {
             try {
-                robot = new Robot();
                 long startTimeMillis = System.currentTimeMillis();
                 long durationMillis = durationSpinner.getValue() * 3600 * 1000L;
 
@@ -209,9 +237,9 @@ public class MouseJigglerApp extends Application {
                         }
                     }
 
-                    Point currentPos = MouseInfo.getPointerInfo().getLocation();
+                    Point2D currentPos = getMousePosition();
                     Thread.sleep(moveIntervalSeconds * 1000L);
-                    Point newPos = MouseInfo.getPointerInfo().getLocation();
+                    Point2D newPos = getMousePosition();
 
                     if (!currentPos.equals(newPos)) {
                         Platform.runLater(() -> statusLabel.setText("Status: Paused"));
@@ -223,13 +251,11 @@ public class MouseJigglerApp extends Application {
 
                     int dx = random.nextInt(11) - 5;
                     int dy = random.nextInt(11) - 5;
-                    robot.mouseMove(currentPos.x + dx, currentPos.y + dy);
+                    mouseMove(currentPos.getX() + dx, currentPos.getY() + dy);
                     logger.info("Mouse moved at " + LocalTime.now().withNano(0));
                 }
             } catch (InterruptedException e) {
                 logger.log(Level.SEVERE, "Jiggler thread interrupted", e);
-            } catch (AWTException e) {
-                logger.log(Level.SEVERE, "AWT Error in jiggler", e);
             } finally {
                 Platform.runLater(() -> stopJiggler(button));
             }
