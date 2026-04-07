@@ -112,6 +112,7 @@ public class JigglerEngine {
                 log("Mouse moved at " + LocalTime.now().withNano(0));
             }
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             logger.log(Level.SEVERE, "Jiggler thread interrupted", e);
         } finally {
             stop();
